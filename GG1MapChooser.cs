@@ -1,16 +1,10 @@
 using System;
 using System.Collections.Concurrent;
-using System.Threading;
-using System.Threading.Tasks;
 using System.Data;
 using System.Diagnostics.CodeAnalysis;
-using System.Linq;
 using System.Text;
-using System.Net.Http.Headers;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using System.Threading;
-using CTimer = System.Threading.Timer;
 using Microsoft.Extensions.Localization;
 using Microsoft.Extensions.Logging;
 using CounterStrikeSharp.API;
@@ -22,16 +16,12 @@ using CounterStrikeSharp.API.Modules.Admin;
 using CounterStrikeSharp.API.Modules.Commands;
 using CounterStrikeSharp.API.Modules.Cvars;
 using CounterStrikeSharp.API.Modules.Entities;
-using CounterStrikeSharp.API.Modules.Entities.Constants;
 using CounterStrikeSharp.API.Modules.Events;
 using CounterStrikeSharp.API.Modules.Menu;
 using CounterStrikeSharp.API.Modules.Timers;
 using Timer = CounterStrikeSharp.API.Modules.Timers.Timer;
 using CounterStrikeSharp.API.Modules.Utils;
-using CounterStrikeSharp.API.Modules.Listeners;
 using MapChooserAPI;
-using Microsoft.VisualBasic;
-using McMaster.NETCore.Plugins;
 
 namespace MapChooser;
 
@@ -3615,7 +3605,8 @@ public class MapChooser : BasePlugin, IPluginConfig<MCConfig>
             {
                 _selectedMap = mapsToVote[random.Next(mapsToVote.Count)];
                 PrintToServerChat("randommap.selected", _selectedMap);
-                Logger.LogInformation($"TimerVoteMap: selected random map {_selectedMap}");
+                Logger.LogInformation($"TimerVoteMap: no votes cast, selected random map {_selectedMap}, forcing immediate map change");
+                changeTime = SSMC_ChangeMapTime.ChangeMapTime_Now;
             }
             else
             {
@@ -3628,6 +3619,7 @@ public class MapChooser : BasePlugin, IPluginConfig<MCConfig>
                     _selectedMap = mapsToVote[random.Next(mapsToVote.Count)];
                     PrintToServerChat("randommap.selected", _selectedMap);
                     Logger.LogInformation($"TimerVoteMap: selected random map {_selectedMap}");
+                    changeTime = SSMC_ChangeMapTime.ChangeMapTime_Now;
                 }
                 else
                 {
@@ -3694,8 +3686,8 @@ public class MapChooser : BasePlugin, IPluginConfig<MCConfig>
             Logger.LogInformation("TimerVoteMap: mapsToVote.Count <= 0");
         }
         IsVoteInProgress = false;
-        GGMCDoAutoMapChange(changeTime);
-        VoteChangeTimerStart(changeTime);
+        GGMCDoAutoMapChange(SSMC_ChangeMapTime.ChangeMapTime_Now);
+        VoteChangeTimerStart(SSMC_ChangeMapTime.ChangeMapTime_Now);
     }
     private void VoteChangeTimerStart(SSMC_ChangeMapTime changeTime = SSMC_ChangeMapTime.ChangeMapTime_Now)
     {
