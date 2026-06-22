@@ -81,5 +81,7 @@
   "poolvote.changed": "Karšu kopums nomainīts uz {0}",
   "poolvote.keep": "Balsojumam nav rezultāta. Saglabājam esošo kopumu.",
   "poolvote.notenoughpools": " {red}Nepietiek kopumu balsošanai.",
-  "poolvote.choice": "{0} nobalsoja par kopumu {1}"
+  "poolvote.choice": "{0} nobalsoja par kopumu {1}",
+  "mapduration.start": "{green}Karte mainīsies pēc {0} minūtēm.",
+  "mapduration.remaining": "{yellow}Atlikušas {0} minūtes šajā kartē."
 }

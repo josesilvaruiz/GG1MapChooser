@@ -82,5 +82,7 @@
   "poolvote.changed": "Пул карт изменён на {0}",
   "poolvote.keep": "Голосование без результата. Текущий пул сохранён.",
   "poolvote.notenoughpools": " {red}Недостаточно пулов для голосования.",
-  "poolvote.choice": "{0} проголосовал за пул {1}"
+  "poolvote.choice": "{0} проголосовал за пул {1}",
+  "mapduration.start": "{green}Карта сменится через {0} минут.",
+  "mapduration.remaining": "{yellow}Осталось {0} минут на этой карте."
 }

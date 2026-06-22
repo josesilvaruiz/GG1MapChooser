@@ -81,5 +81,7 @@
   "poolvote.changed": "Pool de mapas alterado para {0}",
   "poolvote.keep": "Votação sem resultado. Mantendo o pool atual.",
   "poolvote.notenoughpools": " {red}Pools insuficientes para iniciar a votação.",
-  "poolvote.choice": "{0} votou no pool {1}"
+  "poolvote.choice": "{0} votou no pool {1}",
+  "mapduration.start": "{green}Este mapa será trocado em {0} minutos.",
+  "mapduration.remaining": "{yellow}Restam {0} minutos neste mapa."
 }

@@ -28,7 +28,7 @@ namespace MapChooser;
 public class MapChooser : BasePlugin, IPluginConfig<MCConfig>
 {
     public override string ModuleName => "GG1_MapChooser";
-    public override string ModuleVersion => "v1.8.0";
+    public override string ModuleVersion => "v1.8.2";
     public override string ModuleAuthor => "Sergey";
     public override string ModuleDescription => "Map chooser, voting, rtv, nominate, etc.";
     public MCCoreAPI MCCoreAPI { get; set; } = null!;
@@ -125,6 +125,9 @@ public class MapChooser : BasePlugin, IPluginConfig<MCConfig>
     private float TimeLimitValue;
     private int TimeLimitExtends; // number of times when TimeLimit was extended to not allow it more than 2 times.
     private DateTime timeLimitStartEventTime = DateTime.MinValue;
+    private Timer? _maxMapDurationTimer = null;
+    private Timer? _maxMapDurationAnnounceTimer = null;
+    private DateTime _maxMapDurationStartTime = DateTime.MinValue;
     public ChatMenu? GlobalChatMenu { get; set; } = null;
     public IWasdMenu? GlobalWASDMenu { get; set; } = null;
     public ChatMenu? PoolChatMenu { get; set; } = null;
@@ -491,6 +494,10 @@ public class MapChooser : BasePlugin, IPluginConfig<MCConfig>
         PoolWASDMenu = null;
         SimpleKillTimer(timersLog);
         timersLog = null;
+        SimpleKillTimer(_maxMapDurationTimer);
+        _maxMapDurationTimer = null;
+        SimpleKillTimer(_maxMapDurationAnnounceTimer);
+        _maxMapDurationAnnounceTimer = null;
     }
     public HookResult EventRoundAnnounceWarmupHandler(EventRoundAnnounceWarmup @event, GameEventInfo info)
     {
@@ -549,6 +556,40 @@ public class MapChooser : BasePlugin, IPluginConfig<MCConfig>
                 if (Config.PoolVoteSettings.Enable && !_poolVoteConfigInvalid && Config.PoolVoteSettings.DelayFromStart > 0)
                 {
                     MakePoolVoteTimer(Config.PoolVoteSettings.DelayFromStart);
+                }
+                Logger.LogInformation($"[MaxMapDuration] Check: MaxMapDurationMinutes={Config.OtherSettings.MaxMapDurationMinutes}");
+                if (Config.OtherSettings.MaxMapDurationMinutes > 0)
+                {
+                    float maxDurationSeconds = Config.OtherSettings.MaxMapDurationMinutes * 60.0f;
+                    SimpleKillTimer(_maxMapDurationTimer);
+                    SimpleKillTimer(_maxMapDurationAnnounceTimer);
+                    _maxMapDurationStartTime = DateTime.UtcNow;
+                    _maxMapDurationTimer = AddTimer(maxDurationSeconds, () =>
+                    {
+                        _maxMapDurationTimer = null;
+                        SimpleKillTimer(_maxMapDurationAnnounceTimer);
+                        _maxMapDurationAnnounceTimer = null;
+                        Logger.LogInformation($"[MaxMapDuration] {Config.OtherSettings.MaxMapDurationMinutes} minutes reached, forcing random map change.");
+                        GGMCDoAutoMapChange(SSMC_ChangeMapTime.ChangeMapTime_Now);
+                    }, TimerFlags.STOP_ON_MAPCHANGE);
+                    int _announceMinutes = Config.OtherSettings.MaxMapDurationMinutes;
+                    AddTimer(5.0f, () =>
+                    {
+                        Logger.LogInformation($"[MaxMapDuration] Printing start message to chat ({_announceMinutes} min).");
+                        PrintToServerChat("mapduration.start", _announceMinutes);
+                    }, TimerFlags.STOP_ON_MAPCHANGE);
+                    _maxMapDurationAnnounceTimer = AddTimer(300.0f, () =>
+                    {
+                        int remainingSeconds = (int)(Config.OtherSettings.MaxMapDurationMinutes * 60 - (DateTime.UtcNow - _maxMapDurationStartTime).TotalSeconds);
+                        if (remainingSeconds > 0)
+                        {
+                            int minsLeft = remainingSeconds / 60;
+                            int secsLeft = remainingSeconds % 60;
+                            Logger.LogInformation($"[MaxMapDuration] Announce tick: {minsLeft}m {secsLeft}s remaining.");
+                            PrintToServerChat("time.left", minsLeft, secsLeft);
+                        }
+                    }, TimerFlags.REPEAT | TimerFlags.STOP_ON_MAPCHANGE);
+                    Logger.LogInformation($"[MaxMapDuration] Timer started: {Config.OtherSettings.MaxMapDurationMinutes} minutes ({maxDurationSeconds}s).");
                 }
                 if (Config.TimeLimitSettings.VoteDependsOnTimeLimit)
                 {
@@ -2717,6 +2758,17 @@ public class MapChooser : BasePlugin, IPluginConfig<MCConfig>
             if (winsLeft > 0)
                 caller.PrintToChat(Localizer["wins.left", winsLeft]);
         }
+        if (Config.OtherSettings.MaxMapDurationMinutes > 0 && _maxMapDurationStartTime != DateTime.MinValue
+            && !(Config.TimeLimitSettings.VoteDependsOnTimeLimit && TimeLimitValue > 0))
+        {
+            int remainingSeconds = (int)(Config.OtherSettings.MaxMapDurationMinutes * 60 - (DateTime.UtcNow - _maxMapDurationStartTime).TotalSeconds);
+            if (remainingSeconds > 0)
+            {
+                int minutesLeft = remainingSeconds / 60;
+                int secondsLeft = remainingSeconds % 60;
+                caller.PrintToChat(Localizer["time.left", minutesLeft, secondsLeft]);
+            }
+        }
         //*********************** add message if both are not set ************************************
     }
 
@@ -3059,6 +3111,48 @@ public class MapChooser : BasePlugin, IPluginConfig<MCConfig>
         menu.Add(Localizer["pool.switch.menu"], AdminPoolSwitchHandle); // Switch map pool
         menu.Add(Localizer["pool.vote.menu"], AdminPoolVoteHandle); // Start pool vote
         wASDMenu.manager.OpenMainMenu(caller, menu);
+    }
+
+    [ConsoleCommand("css_maxmapduration", "Set max map duration in minutes. 0 = disabled.")]
+    [CommandHelper(minArgs: 1, usage: "<minutes>", whoCanExecute: CommandUsage.CLIENT_AND_SERVER)]
+    [RequiresPermissions("@css/root")]
+    public void SetMaxMapDurationCommand(CCSPlayerController? caller, CommandInfo command)
+    {
+        if (!int.TryParse(command.GetArg(1), out int minutes) || minutes < 0)
+        {
+            command.ReplyToCommand("[GGMC] Usage: css_maxmapduration <minutes> (0 = disabled)");
+            return;
+        }
+        Config.OtherSettings.MaxMapDurationMinutes = minutes;
+        SimpleKillTimer(_maxMapDurationTimer);
+        _maxMapDurationTimer = null;
+        SimpleKillTimer(_maxMapDurationAnnounceTimer);
+        _maxMapDurationAnnounceTimer = null;
+        if (minutes > 0 && _matchStarted)
+        {
+            _maxMapDurationStartTime = DateTime.UtcNow;
+            _maxMapDurationTimer = AddTimer(minutes * 60.0f, () =>
+            {
+                _maxMapDurationTimer = null;
+                SimpleKillTimer(_maxMapDurationAnnounceTimer);
+                _maxMapDurationAnnounceTimer = null;
+                Logger.LogInformation($"MaxMapDuration of {minutes} minutes reached, forcing random map change.");
+                GGMCDoAutoMapChange(SSMC_ChangeMapTime.ChangeMapTime_Now);
+            }, TimerFlags.STOP_ON_MAPCHANGE);
+            PrintToServerChat("mapduration.start", minutes);
+            _maxMapDurationAnnounceTimer = AddTimer(300.0f, () =>
+            {
+                int remainingSeconds = (int)(Config.OtherSettings.MaxMapDurationMinutes * 60 - (DateTime.UtcNow - _maxMapDurationStartTime).TotalSeconds);
+                if (remainingSeconds > 0)
+                {
+                    int minsLeft = remainingSeconds / 60;
+                    int secsLeft = remainingSeconds % 60;
+                    PrintToServerChat("time.left", minsLeft, secsLeft);
+                }
+            }, TimerFlags.REPEAT | TimerFlags.STOP_ON_MAPCHANGE);
+        }
+        command.ReplyToCommand($"[GGMC] MaxMapDuration set to {minutes} minutes" + (minutes == 0 ? " (disabled)" : "") + ".");
+        Logger.LogInformation($"MaxMapDuration changed to {minutes} minutes by {(caller != null ? caller.PlayerName : "server")}.");
     }
 
     [ConsoleCommand("ggmc_mapvote_start", "Start map vote.")]
@@ -5070,6 +5164,10 @@ public class OtherSettings
     /* Maps used when player count is <= LowPlayerMaxPlayers */
     [JsonPropertyName("LowPlayerMaps")]
     public Dictionary<string, MapInfo> LowPlayerMaps { get; set; } = new Dictionary<string, MapInfo>();
+
+    /* Maximum duration in minutes a map can run before a forced random map change. 0 = disabled */
+    [JsonPropertyName("MaxMapDurationMinutes")]
+    public int MaxMapDurationMinutes { get; set; } = 20;
 }
 public enum SSMC_ChangeMapTime
 {

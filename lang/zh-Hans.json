@@ -81,5 +81,7 @@
   "poolvote.changed": "图池已切换为 {0}（若当前为低人数图池，将在人数达到阈值后生效）",
   "poolvote.keep": "图池投票平局或与当前图池相同，保持当前图池",
   "poolvote.notenoughpools": " {red}图池数量不足，无法投票",
-  "poolvote.choice": "{0} 投票选择图池 {1}"
+  "poolvote.choice": "{0} 投票选择图池 {1}",
+  "mapduration.start": "{green}此地图将在 {0} 分钟后更换。",
+  "mapduration.remaining": "{yellow}此地图还剩 {0} 分钟。"
 }

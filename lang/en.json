@@ -82,5 +82,7 @@
   "poolvote.changed": "Map pool changed to {0}",
   "poolvote.keep": "Pool vote had no result. Keeping current pool.",
   "poolvote.notenoughpools": " {red}Not enough pools to start pool vote.",
-  "poolvote.choice": "{0} voted for pool {1}"
+  "poolvote.choice": "{0} voted for pool {1}",
+  "mapduration.start": "{green}This map will change in {0} minutes.",
+  "mapduration.remaining": "{yellow}{0} minutes remaining on this map."
 }
